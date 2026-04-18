@@ -95,6 +95,8 @@ const PLAY_RECORDS_KEY = 'moontv_play_records';
 const FAVORITES_KEY = 'moontv_favorites';
 const MANGA_SHELF_KEY = 'moontv_manga_shelf';
 const MANGA_HISTORY_KEY = 'moontv_manga_history';
+const DEFAULT_MAX_MANGA_HISTORY_RECORDS = 100;
+const DEFAULT_MAX_MANGA_HISTORY_THRESHOLD = DEFAULT_MAX_MANGA_HISTORY_RECORDS + 10;
 const SEARCH_HISTORY_KEY = 'moontv_search_history';
 const MUSIC_PLAY_RECORDS_KEY = 'moontv_music_play_records';
 
@@ -1701,6 +1703,17 @@ export async function clearAllMangaShelf(): Promise<void> {
   window.dispatchEvent(new CustomEvent('mangaShelfUpdated', { detail: {} }));
 }
 
+function trimMangaReadRecords(records: Record<string, MangaReadRecord>): Record<string, MangaReadRecord> {
+  const entries = Object.entries(records);
+  if (entries.length <= DEFAULT_MAX_MANGA_HISTORY_THRESHOLD) return records;
+
+  return Object.fromEntries(
+    entries
+      .sort(([, a], [, b]) => b.saveTime - a.saveTime)
+      .slice(0, DEFAULT_MAX_MANGA_HISTORY_RECORDS)
+  );
+}
+
 export async function getAllMangaReadRecords(): Promise<Record<string, MangaReadRecord>> {
   if (typeof window === 'undefined') return {};
 
@@ -1748,8 +1761,9 @@ export async function saveMangaReadRecord(sourceId: string, mangaId: string, rec
   if (STORAGE_TYPE !== 'localstorage') {
     const cached = cacheManager.getCachedMangaReadRecords() || {};
     cached[key] = record;
-    cacheManager.cacheMangaReadRecords(cached);
-    window.dispatchEvent(new CustomEvent('mangaHistoryUpdated', { detail: cached }));
+    const trimmedRecords = trimMangaReadRecords(cached);
+    cacheManager.cacheMangaReadRecords(trimmedRecords);
+    window.dispatchEvent(new CustomEvent('mangaHistoryUpdated', { detail: trimmedRecords }));
 
     try {
       await fetchWithAuth('/api/manga/history', {
@@ -1766,8 +1780,9 @@ export async function saveMangaReadRecord(sourceId: string, mangaId: string, rec
 
   const allRecords = await getAllMangaReadRecords();
   allRecords[key] = record;
-  localStorage.setItem(MANGA_HISTORY_KEY, JSON.stringify(allRecords));
-  window.dispatchEvent(new CustomEvent('mangaHistoryUpdated', { detail: allRecords }));
+  const trimmedRecords = trimMangaReadRecords(allRecords);
+  localStorage.setItem(MANGA_HISTORY_KEY, JSON.stringify(trimmedRecords));
+  window.dispatchEvent(new CustomEvent('mangaHistoryUpdated', { detail: trimmedRecords }));
 }
 
 export async function deleteMangaReadRecord(sourceId: string, mangaId: string): Promise<void> {

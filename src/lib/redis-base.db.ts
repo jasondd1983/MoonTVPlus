@@ -1557,6 +1557,8 @@ export abstract class BaseRedisStorage implements IStorage {
   async cleanupOldMangaReadRecords(userName: string): Promise<void> {
     const records = await this.getAllMangaReadRecords(userName);
     const maxRecords = parseInt(process.env.MAX_MANGA_HISTORY_PER_USER || '100', 10);
+    const threshold = maxRecords + 10;
+    if (Object.keys(records).length <= threshold) return;
     const keys = Object.entries(records)
       .sort(([, a], [, b]) => b.saveTime - a.saveTime)
       .slice(maxRecords)

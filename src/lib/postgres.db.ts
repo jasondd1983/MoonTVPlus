@@ -2037,13 +2037,14 @@ export class PostgresStorage implements IStorage {
   async cleanupOldMangaReadRecords(userName: string): Promise<void> {
     try {
       const maxRecords = parseInt(process.env.MAX_MANGA_HISTORY_PER_USER || '100', 10);
+      const threshold = maxRecords + 10;
       const countResult = await this.db
         .prepare('SELECT COUNT(*) as count FROM manga_read_records WHERE username = $1')
         .bind(userName)
         .first();
 
       const count = Number(countResult?.count || 0);
-      if (count <= maxRecords) return;
+      if (count <= threshold) return;
 
       await this.db
         .prepare(`
